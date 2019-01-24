@@ -1,6 +1,6 @@
 clear;clc;close all
 %% temperory
-NN=2;
+NN=3;
 %% set some Constants
 global K1 K2 K3 K4 L1 L2 m1 m2 dt
 %%Constants 
