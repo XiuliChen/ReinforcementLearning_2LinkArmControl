@@ -1,10 +1,13 @@
 clear;clc;close all
-
+%% temperory
+NN=2;
 %% set some Constants
 global K1 K2 K3 K4 L1 L2 m1 m2 dt
 %%Constants 
-L1 = 0.3; %link 1 length (30cm)
-L2 = 0.33; %link 2 length (33cm)
+% https://hypertextbook.com/facts/2006/bodyproportions.shtml (size of human)
+L1 = 0.26; %link 1 length (upper arm)
+L2 = 0.43; %link 2 length (fore arm +hand)
+
 m1 = 1.4; %link 1 mass (1.4kg)
 m2 = 1.1; %link 2 mass (1.1kg)
 dt = .1; %Simulation time step 
@@ -17,41 +20,54 @@ K4 = 1/2*m2*L1*L2; %for ddTheta1 and ddTheta2
 %% plot the set-up (e.g., the arm and targets)
 % initial arm endEffector (The home zone)
 
-Theta10 = pi/5.5; %Shoulder joint angle 
-Theta20 = pi/1.5; %Elbow joint angle  
-[x1,y1,x2,y2]=endEffector(Theta10,Theta20,L1,L2);
-scale=0.5;
-% give the target locations
-t1=[0,0.075].*scale;t2=[0.07,0.027].*scale;
-t0=[0,0].*scale;
-t4=[0,-0.075].*scale;t3=[0.07,-0.027].*scale;
+Theta10 = pi/3.162; %Shoulder joint angle 
+Theta20 = pi/1.93; %Elbow joint angle  
+[x10,y10,x20,y20]=endEffector(Theta10,Theta20,L1,L2);
 
+
+halfChunk=0.23;
+homeZoneToChest=0.43;
+
+%% the task spec given by the experimenter (S.S.)
+% give the target locations
+t1=[0,0.10];t2=[0.025,0.05];
+t0=[0,0];
+t4=[0,-0.10];t3=[0.025,-0.05];
+% a sequence of these locations
 targets=[t1;t0;t3;t0;t2;t0;t4;t0];
 
-NN=2;
-% the plotting area;
-xRight=0.02;
-xLeft=-0.1;
-yTop=0.375;
-yBottom=0.25;
+
+
+% the active area for the pointing;
+xLeft=-halfChunk-0.05;
+xRight=xLeft+0.13;
+
+yTop=homeZoneToChest+0.15;
+yBottom=homeZoneToChest-0.15;
 
     
 
-targets(:,1)=targets(:,1)+x2;
-targets(:,2)=targets(:,2)+y2;
+targets(:,1)=targets(:,1)-halfChunk;
+
+targets(:,2)=targets(:,2)+homeZoneToChest;
 nTargets=size(targets,1);
 figure('position', [200 200 600 600])
+
+
+%% plot the set up
+plotSetup
+
 %%
 % initial state
 
-a1=[-0.3,-0.2,-0.1,0,0.1,0.2,0.3];
+a1=[-1:0.2:1];
 actions= combvec(a1,a1);
 nActions=size(actions,2);
 
 
 listPtr = 1; 
 QTableEnterMap = containers.Map;
-QT=zeros(1e7*2, nActions);
+QT=zeros(1e6, nActions);
 
 
 gamma = 1;    % <- take this is an undiscounted task 
@@ -98,6 +114,7 @@ xxyy=NaN(2,maxSteps);
 
 whichTar=NaN(1,maxSteps);
 cumReward=0;
+hReach=0;
 while ~terminal
     % choose an action
     max_inx=find(QT(stateIndex,:)==max(QT(stateIndex,:)));
@@ -244,20 +261,15 @@ if reach==1
     end
     clear cm
     cm=colormap(winter(min_Steps));
+    
     clf
-    plot(targets(:,1),targets(:,2),'ks','MarkerSize',15)  
-    
-    rectangle('Position', [xLeft, yBottom, xRight-xLeft, yTop-yBottom],...
-    'EdgeColor','k', 'LineWidth', 3)
-    
-    grid on
-    axis([-0.3 0.3 -0.01 0.4]); 
-    hold on  
+    plotSetup
+
     set(gca,'FontSize',12)
-    set(gca,'xTickLabels',get(gca,'xTick').*100)
-    set(gca,'yTickLabels',get(gca,'yTick').*100)
-    xlabel('cm');
-    ylabel('cm');
+%     set(gca,'xTickLabels',get(gca,'xTick').*100)
+%     set(gca,'yTickLabels',get(gca,'yTick').*100)
+    xlabel('meter');
+    ylabel('meter');
     wt0=0;
     for s=1:min_Steps     
         Theta1=min_xxyy(1,s);
@@ -266,19 +278,32 @@ if reach==1
         if wt>wt0
             wt0=wt;
             if wt0>1
-                plot(targets(wt0-1,1),targets(wt0-1,2),'ys','MarkerSize',15,'MarkerFaceColor','y') 
+                hReach=plot(targets(wt0-1,1),targets(wt0-1,2),'gs','MarkerSize',15,'MarkerFaceColor','g');
             end
-            plot(targets(wt0,1),targets(wt0,2),'rs','MarkerSize',15,'MarkerFaceColor','r')
+            hNext=plot(targets(wt0,1),targets(wt0,2),'rs','MarkerSize',15,'MarkerFaceColor','r');
         end
+        
+         
+        
         [x1,y1,x2,y2]=endEffector(Theta1,Theta2,L1,L2);
-        plot([0 x1],[0 y1],'linewidth',1,'color','k'); hold on%plot shoulder to elbow 
-        plot([x1 x2],[y1,y2],'linewidth',1,'color','k') %plot elbow to hand 
+        plot([0 x1],[0 y1],'linewidth',1,'color','b'); hold on%plot shoulder to elbow 
+        plot([x1 x2],[y1,y2],'linewidth',1,'color','b') %plot elbow to hand 
 
-        plot(x2,y2,'r.','markerSize',13,'color',cm(s,:)); 
-%         plot(targets(wt,1),targets(wt,2),'ms','MarkerSize',15,'MarkerFaceColor','m')   
-        pause(0.1)
+        plot(x2,y2,'r.','markerSize',23,'color',cm(s,:));  
+        pause(0.2)
 
         hold on
+    
+        if hReach~=0
+            legend([hNext,hReach],{'Next Target';'Reached'})
+        else
+            legend(hNext,'Next Target')
+        end
+    end
+    % the final target
+    if reach==1
+    hReach=plot(targets(NN,1),targets(NN,2),'gs','MarkerSize',15,'MarkerFaceColor','g');
+    pause(0.1)
     end
 end
 end
